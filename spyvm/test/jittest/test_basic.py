@@ -579,3 +579,58 @@ class TestBasic(BaseJITTest):
         guard_false(i77, descr=<Guard0xa11aca0>),
         jump(p0, p3, p4, i5, i6, p7, i8, i9, p11, p12, p13, p16, p18, i75, p26, p28, p30, p32, p34, p36, p38, p40, p42, p44, p46, i58, i76, descr=TargetToken(169079000))
         """)
+
+    def test_inner_loop_unrolling(self, spy, tmpdir):
+        traces = self.run(spy, tmpdir, """
+        1 to: 1000000 do: [:i |
+          1 to: 4 do: [:j | i + j]].
+        """)
+        self.assert_matches(traces[0].loop, """
+        jump(p0, p3, p4, i5, i6, p7, i8, i9, p11, p12, p13, p16, p18, i75, p26, p28, p30, p32, p34, p36, p38, p40, p42, p44, p46, i58, i76, descr=TargetToken(169079000))
+        """)
+
+    def test_convolution_matrix(self, spy, tmpdir):
+        """Runs the following code, defined in SmallInteger>>convolutionMatrix:
+
+        | image result bias factor filter imageX imageY r g b |
+
+        bias := 0.0.
+        factor := 1.0.
+        filter := #(-2 -1 0
+                    -1  1 1
+                     0  1 2).
+        result := Array new: 100.
+
+        image := ByteArray newFrom: #(255 97 104 121 255 90 92 104 255
+        ... ... ... lots of bytes ... ... ...
+        255 14 12 18 255 15 12 13 255 15 14 7 255 14 12 25 255 14 13
+        17).
+
+        0 to: 9 do: [:y |
+                0 to: 9 do: [:x |
+                        r := g := b := 0.0.
+
+                        0 to: 2 do: [:filterY |
+                                0 to: 2 do: [:filterX |
+                                        imageX := (x - (3 // 2) + filterX + 10) \\
+                                                                10.
+                                        imageY := (y - (3 // 2) + filterY + 10) \\
+                                                                10.
+                                        r := r + ((image at: imageX + (imageY * 10) + 1) / 255.0 *
+                                                                (filter at: filterY * 3 + filterX + 1)).
+                                        g := g + ((image at: imageX + (imageY * 10) + 2) / 255.0 *
+                                                                (filter at: filterY * 3 + filterX + 1)).
+                                        b := b + ((image at: imageX + (imageY * 10) + 3) / 255.0 *
+                                                                (filter at: filterY * 3 + filterX + 1))]].
+
+                        result at: y * 10 + x + 1 put: (Color
+                                r: ((factor * r + bias) min: 1.0 max: 0.0)
+                                g: ((factor * g + bias) min: 1.0 max: 0.0)
+                                b: ((factor * b + bias) min: 1.0 max: 0.0))]].
+        """
+        traces = self.run(spy, tmpdir, """
+        1 to: 100000 do: [:i | i convolutionMatrix].
+        """)
+        self.assert_matches(traces[0].loop, """
+        foo
+        """)
