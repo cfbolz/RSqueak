@@ -168,20 +168,11 @@ class Interpreter(object):
             s_frame.state = InactiveContext
 
     def loop_bytecodes(self, s_context, may_context_switch=True):
-        old_pc = 0
         if not jit.we_are_jitted() and may_context_switch:
             self.quick_check_for_interrupt(s_context)
         method = s_context.w_method()
         while True:
             pc = s_context.pc()
-            if pc < old_pc:
-                if jit.we_are_jitted():
-                    # Do the interrupt-check at the end of a loop, don't interrupt loops midway.
-                    self.jitted_check_for_interrupt(s_context)
-                self.jit_driver.can_enter_jit(
-                    pc=pc, self=self, method=method,
-                    s_context=s_context)
-            old_pc = pc
             self.jit_driver.jit_merge_point(
                 pc=pc, self=self, method=method,
                 s_context=s_context)

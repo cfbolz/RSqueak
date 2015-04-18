@@ -281,7 +281,7 @@ class __extend__(ContextPartShadow):
         w_closure = space.newClosure(self.w_self(), self.pc(), numArgs,
                                             self.pop_and_return_n(numCopied))
         self.push(w_closure)
-        self._jump(blockSize)
+        self._jump(blockSize, interp)
 
     # ====== Helpers for send/return bytecodes ======
 
@@ -547,8 +547,17 @@ class __extend__(ContextPartShadow):
 
     # ====== Jump bytecodes ======
 
-    def _jump(self, offset):
-        self.store_pc(self.pc() + offset)
+    def _jump(self, offset, interp):
+        oldpc = self.pc()
+        newpc = self.pc() + offset
+        self.store_pc(newpc)
+        if newpc < oldpc:
+            if jit.we_are_jitted():
+                # Do the interrupt-check at the end of a loop, don't interrupt loops midway.
+                interp.jitted_check_for_interrupt(self)
+            interp.jit_driver.can_enter_jit(
+                pc=newpc, self=interp, method=self.w_method(),
+                s_context=self)
 
     def _jumpConditional(self, interp, expecting_true, position):
         if expecting_true:
@@ -561,7 +570,7 @@ class __extend__(ContextPartShadow):
         # Don't check the class, just compare with only two Boolean instances.
         w_bool = self.pop()
         if w_expected.is_same_object(w_bool):
-            self._jump(position)
+            self._jump(position, interp)
         elif not w_alternative.is_same_object(w_bool):
             self._mustBeBoolean(interp, w_bool)
 
@@ -573,7 +582,7 @@ class __extend__(ContextPartShadow):
 
     @bytecode_implementation()
     def shortUnconditionalJumpBytecode(self, interp, current_bytecode):
-        self._jump(self._shortJumpOffset(current_bytecode))
+        self._jump(self._shortJumpOffset(current_bytecode), interp)
 
     @bytecode_implementation()
     def shortConditionalJumpBytecode(self, interp, current_bytecode):
@@ -583,7 +592,7 @@ class __extend__(ContextPartShadow):
     @bytecode_implementation(parameter_bytes=1)
     def longUnconditionalJumpBytecode(self, interp, current_bytecode, parameter):
         offset = (((current_bytecode & 7) - 4) << 8) + parameter
-        self._jump(offset)
+        self._jump(offset, interp)
 
     @bytecode_implementation(parameter_bytes=1)
     def longJumpIfTrueBytecode(self, interp, current_bytecode, parameter):
