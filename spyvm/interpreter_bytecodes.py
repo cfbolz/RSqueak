@@ -547,11 +547,11 @@ class __extend__(ContextPartShadow):
 
     # ====== Jump bytecodes ======
 
-    def _jump(self, offset, interp):
+    def _jump(self, offset, interp, unroll=False):
         oldpc = self.pc()
         newpc = self.pc() + offset
         self.store_pc(newpc)
-        if newpc < oldpc:
+        if newpc < oldpc and not unroll:
             if jit.we_are_jitted():
                 # Do the interrupt-check at the end of a loop, don't interrupt loops midway.
                 interp.jitted_check_for_interrupt(self)
@@ -569,8 +569,9 @@ class __extend__(ContextPartShadow):
 
         # Don't check the class, just compare with only two Boolean instances.
         w_bool = self.pop()
+        should_unroll = jit.isconstant(w_bool)
         if w_expected.is_same_object(w_bool):
-            self._jump(position, interp)
+            self._jump(position, interp, unroll=should_unroll)
         elif not w_alternative.is_same_object(w_bool):
             self._mustBeBoolean(interp, w_bool)
 
