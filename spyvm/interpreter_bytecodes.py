@@ -549,7 +549,7 @@ class __extend__(ContextPartShadow):
 
     def _jump(self, offset, interp, unroll=False):
         oldpc = self.pc()
-        newpc = self.pc() + offset
+        newpc = oldpc + offset
         self.store_pc(newpc)
         if newpc < oldpc and not unroll:
             if jit.we_are_jitted():
@@ -560,20 +560,14 @@ class __extend__(ContextPartShadow):
                 s_context=self)
 
     def _jumpConditional(self, interp, expecting_true, position):
-        if expecting_true:
-            w_expected = interp.space.w_true
-            w_alternative = interp.space.w_false
-        else:
-            w_alternative = interp.space.w_true
-            w_expected = interp.space.w_false
-
-        # Don't check the class, just compare with only two Boolean instances.
-        w_bool = self.pop()
-        should_unroll = jit.isconstant(w_bool)
-        if w_expected.is_same_object(w_bool):
+        w_obj = self.pop()
+        try:
+            condition = interp.space.unwrap_bool(w_obj)
+        except error.UnwrappingError:
+            return self._mustBeBoolean(interp, w_obj)
+        should_unroll = jit.isconstant(condition)
+        if expecting_true == condition:
             self._jump(position, interp, unroll=should_unroll)
-        elif not w_alternative.is_same_object(w_bool):
-            self._mustBeBoolean(interp, w_bool)
 
     def _shortJumpOffset(self, current_bytecode):
         return (current_bytecode & 7) + 1
