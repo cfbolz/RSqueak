@@ -799,6 +799,59 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
         w_result.store_all(space, my_pointers)
         return w_result
 
+class W_Boolean(W_PointersObject):
+    _attrs_ = ['boolvalue']
+    _immutable_fields_ = ['boolvalue']
+    repr_classname = "W_Boolean"
+
+    def __init__(self, space, boolvalue, w_class=None):
+        W_PointersObject.__init__(self, space, w_class, 0)
+        self.boolvalue = boolvalue
+
+    def fillin(self, space, g_self):
+        W_AbstractObjectWithClassReference.fillin(self, space, g_self)
+        storage_type = space.strategy_factory.strategy_type_for([], g_self.isweak())
+        space.strategy_factory.set_initial_strategy(self, storage_type, 0, [])
+        self.boolvalue = g_self.w_object is space.w_true
+
+    def _setclass(self, space):
+        self.w_class = space.w_true.getclass(space) if self.boolvalue else space.w_false.getclass(space)
+
+    def getclass(self, space):
+        if not self.w_class:
+            self._setclass(space)
+        return W_PointersObject.getclass(self, space)
+
+    def has_class(self):
+        return True
+
+    def class_shadow(self, space):
+        if not self.w_class:
+            self._setclass(space)
+        return W_PointersObject.class_shadow(self, space)
+
+    def guess_classname(self):
+        if self.boolvalue:
+            return "TrueClass"
+        else:
+            return "FalseClass"
+
+    def invariant(self):
+        return isinstance(self.boolvalue, bool)
+
+    def is_same_object(self, other):
+        return (self is other or
+                (isinstance(other, W_Boolean) and
+                 self.boolvalue == other.boolvalue))
+
+    def _become(self, w_other):
+        assert isinstance(w_other, W_Boolean)
+        self.boolvalue, w_other.boolvalue = w_other.boolvalue, self.boolvalue
+
+    def clone(self, space):
+        return W_Boolean(space, self.boolvalue)
+
+
 class W_BytesObject(W_AbstractObjectWithClassReference):
     _attrs_ = ['version', 'bytes', '_size', 'c_bytes']
     repr_classname = 'W_BytesObject'

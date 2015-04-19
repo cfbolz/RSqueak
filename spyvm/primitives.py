@@ -149,7 +149,7 @@ def wrap_primitive(unwrap_spec=None, no_result=False,
                     elif spec is char:
                         args += (unwrap_char(w_arg), )
                     elif spec is bool:
-                        args += (interp.space.w_true is w_arg, )
+                        args += (interp.space.unwrap_bool(w_arg), )
                     else:
                         raise NotImplementedError(
                             "unknown unwrap_spec %s" % (spec, ))
@@ -1221,7 +1221,7 @@ def func(interp, s_frame, w_rcvr, fd):
 
 @expose_primitive(FILE_OPEN, unwrap_spec=[object, str, object])
 def func(interp, s_frame, w_rcvr, filename, w_writeable_flag):
-    if w_writeable_flag.is_same_object(interp.space.w_true):
+    if interp.space.unwrap_bool(w_writeable_flag):
         mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
     else:
         mode = os.O_RDONLY

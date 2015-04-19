@@ -48,10 +48,7 @@ def isRSqueak(interp, s_frame, w_rcvr):
 @DebuggingPlugin.expose_primitive(unwrap_spec=[object])
 def isVMTranslated(interp, s_frame, w_rcvr):
     from rpython.rlib.objectmodel import we_are_translated
-    if we_are_translated():
-        return interp.space.w_true
-    else:
-        return interp.space.w_false
+    return interp.space.wrap_bool(we_are_translated())
 
 @DebuggingPlugin.expose_primitive(unwrap_spec=[object, object])
 def debugPrint(interp, s_frame, w_rcvr, w_string):
@@ -62,7 +59,4 @@ def debugPrint(interp, s_frame, w_rcvr, w_string):
 
 @DebuggingPlugin.expose_primitive(unwrap_spec=[object])
 def stopUIProcess(interp, s_frame, w_rcvr):
-    if DebuggingPlugin.userdata.get('stop_ui', False):
-        return interp.space.w_true
-    else:
-        return interp.space.w_false
+    return interp.space.wrap_bool(DebuggingPlugin.userdata.get('stop_ui', False))

@@ -48,7 +48,7 @@ def primitiveDirectoryLookup(interp, s_frame, w_file_directory, full_path, index
     w_name = space.wrap_string(py_name)
     w_creationTime = smalltalk_timestamp(space, file_info.st_ctime)
     w_modificationTime = smalltalk_timestamp(space, file_info.st_mtime)
-    w_dirFlag = space.w_true if stat.S_IFDIR & file_info.st_mode else space.w_false
+    w_dirFlag = space.wrap_bool(stat.S_IFDIR & file_info.st_mode)
     w_fileSize = space.wrap_int(rarithmetic.intmask(file_info.st_size))
 
     return space.wrap_list([w_name, w_creationTime, w_modificationTime,
@@ -58,7 +58,7 @@ def primitiveDirectoryLookup(interp, s_frame, w_file_directory, full_path, index
 def primitiveFileOpen(interp, s_frame, w_rcvr, file_path, w_writeable_flag):
     space = interp.space
     file_missing = not os.path.exists(file_path)
-    if w_writeable_flag is space.w_true:
+    if space.unwrap_bool(w_writeable_flag):
         if file_missing:
             mode = os.O_RDWR | os.O_CREAT
         else:
@@ -84,10 +84,7 @@ def primitiveFileClose(interp, s_frame, w_rcvr, fd):
 @FilePlugin.expose_primitive(unwrap_spec=[object, int])
 def primitiveFileAtEnd(interp, s_frame, w_rcvr, fd):
     file_info = os.fstat(fd)
-    if os.lseek(fd, 0, os.SEEK_CUR) >= file_info.st_size:
-        return interp.space.w_true
-    else:
-        return interp.space.w_false
+    return interp.space.wrap_bool(os.lseek(fd, 0, os.SEEK_CUR) >= file_info.st_size)
 
 @FilePlugin.expose_primitive(unwrap_spec=[object, int, object, index1_0, int])
 def primitiveFileRead(interp, s_frame, w_rcvr, fd, target, start, count):

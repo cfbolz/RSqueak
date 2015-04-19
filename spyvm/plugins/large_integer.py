@@ -36,7 +36,7 @@ for (name, primitive) in negOps.items():
         def func(interp, s_frame, argcount):
             if argcount != 3:
                 raise PrimitiveFailedError
-            neg = interp.space.w_true is s_frame.pop()
+            neg = interp.space.unwrap_bool(s_frame.pop())
             return primfunc(interp, s_frame, 2)
         func.func_name = name
         LargeIntegerPlugin.expose_primitive(clean_stack=False, no_result=True)(func)

@@ -46,6 +46,9 @@ class ConstantObject(object):
 def empty_object():
     return instantiate(model.W_PointersObject)
 
+def empty_bool():
+    return instantiate(model.W_Boolean)
+
 class ObjSpace(object):
     _immutable_fields_ = ['objtable']
 
@@ -124,10 +127,14 @@ class ObjSpace(object):
         obj = empty_object()
         self.add_bootstrap_object(name, obj)
 
+    def make_bootstrap_boolean(self, name):
+        obj = empty_bool()
+        self.add_bootstrap_object(name, obj)
+
     def make_bootstrap_objects(self):
         self.make_bootstrap_object("w_charactertable")
-        self.make_bootstrap_object("w_true")
-        self.make_bootstrap_object("w_false")
+        self.make_bootstrap_boolean("w_true")
+        self.make_bootstrap_boolean("w_false")
         self.make_bootstrap_object("w_special_selectors")
         self.add_bootstrap_object("w_minus_one", model.W_SmallInteger(-1))
         self.add_bootstrap_object("w_zero", model.W_SmallInteger(0))
@@ -190,10 +197,7 @@ class ObjSpace(object):
         return self.w_charactertable.fetch(self, ord(c))
 
     def wrap_bool(self, b):
-        if b:
-            return self.w_true
-        else:
-            return self.w_false
+        return model.W_Boolean(self, b)
 
     def wrap_list(self, lst_w):
         """
@@ -228,6 +232,11 @@ class ObjSpace(object):
 
     def unwrap_char(self, w_char):
         return w_char.unwrap_char(self)
+
+    def unwrap_bool(self, w_b):
+        if not isinstance(w_b, model.W_Boolean):
+            raise UnwrappingError
+        return w_b.boolvalue
 
     def unwrap_float(self, w_v):
         return w_v.unwrap_float(self)

@@ -141,10 +141,7 @@ def push(w_object):
 @expose_on_virtual_machine_proxy([bool], int)
 def pushBool(trueOrFalse):
     s_frame = IProxy.s_frame
-    if trueOrFalse:
-        s_frame.push(IProxy.interp.space.w_true)
-    else:
-        s_frame.push(IProxy.interp.space.w_false)
+    s_frame.push(IProxy.interp.space.wrap_bool(trueOrFalse))
     return 0
 
 @expose_on_virtual_machine_proxy([float], int)
@@ -386,11 +383,7 @@ def isWordsOrBytes(w_object):
 @expose_on_virtual_machine_proxy([oop], bool)
 def booleanValueOf(w_object):
     space = IProxy.space
-    if space.w_true.is_same_object(w_object):
-        return True
-    if space.w_false.is_same_object(w_object):
-        return False
-    raise ProxyFunctionFailed
+    return space.unwrap_bool(w_object)
 
 @expose_on_virtual_machine_proxy([oop], int)
 def checkedIntegerValueOf(w_object):
