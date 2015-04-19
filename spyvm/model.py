@@ -805,14 +805,13 @@ class W_Boolean(W_PointersObject):
     repr_classname = "W_Boolean"
 
     def __init__(self, space, boolvalue, w_class=None):
-        W_PointersObject.__init__(self, space, w_class, 0)
         self.boolvalue = boolvalue
+        W_PointersObject.__init__(self, space, w_class, 0)
 
     def fillin(self, space, g_self):
-        W_AbstractObjectWithClassReference.fillin(self, space, g_self)
+        W_AbstractObjectWithIdentityHash.fillin(self, space, g_self)
         storage_type = space.strategy_factory.strategy_type_for([], g_self.isweak())
         space.strategy_factory.set_initial_strategy(self, storage_type, 0, [])
-        self.boolvalue = g_self.w_object is space.w_true
 
     def _setclass(self, space):
         self.w_class = space.w_true.getclass(space) if self.boolvalue else space.w_false.getclass(space)

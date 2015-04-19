@@ -46,8 +46,10 @@ class ConstantObject(object):
 def empty_object():
     return instantiate(model.W_PointersObject)
 
-def empty_bool():
-    return instantiate(model.W_Boolean)
+def empty_bool(b):
+    w_b = instantiate(model.W_Boolean)
+    w_b.boolvalue = b
+    return w_b
 
 class ObjSpace(object):
     _immutable_fields_ = ['objtable']
@@ -127,14 +129,14 @@ class ObjSpace(object):
         obj = empty_object()
         self.add_bootstrap_object(name, obj)
 
-    def make_bootstrap_boolean(self, name):
-        obj = empty_bool()
+    def make_bootstrap_boolean(self, name, b):
+        obj = empty_bool(b)
         self.add_bootstrap_object(name, obj)
 
     def make_bootstrap_objects(self):
         self.make_bootstrap_object("w_charactertable")
-        self.make_bootstrap_boolean("w_true")
-        self.make_bootstrap_boolean("w_false")
+        self.make_bootstrap_boolean("w_true", True)
+        self.make_bootstrap_boolean("w_false", False)
         self.make_bootstrap_object("w_special_selectors")
         self.add_bootstrap_object("w_minus_one", model.W_SmallInteger(-1))
         self.add_bootstrap_object("w_zero", model.W_SmallInteger(0))
