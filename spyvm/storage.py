@@ -5,6 +5,8 @@ from spyvm.util.version import VersionMixin
 from rpython.rlib import objectmodel, jit
 from rpython.rlib.objectmodel import import_from_mixin
 from rpython.rlib.rstrategies import rstrategies as rstrat
+from rpython.rlib import longlong2float as ll2f
+from rpython.rlib.rarithmetic import r_longlong, intmask, r_uint
 
 """
 A note on terminology:
@@ -94,6 +96,58 @@ class WeakListStrategy(SingletonStorageStrategy):
     import_from_mixin(rstrat.WeakGenericStrategy)
 
 @rstrat.strategy(generalize=[ListStrategy])
+class LargePositiveIntegerOrNilStrategy(SingletonStorageStrategy):
+    repr_classname = "LargePositiveIntegerOrNilStrategy"
+    import_from_mixin(rstrat.GenericStrategy)
+    tag = r_uint(constants.U_MAXINT)
+    def _wrap(self, val):
+        if val == self.tag:
+            return self.space.w_nil
+        else:
+            return self.space.wrap_int(val)
+    def _unwrap(self, w_val):
+        if w_val is self.space.w_nil:
+            return self.tag
+        else:
+            return self.space.unwrap_uint(w_val)
+    def _check_can_handle(self, wrapped_value):
+        return ((((isinstance(wrapped_value, model.W_SmallInteger) and
+                   self.space.unwrap_int(wrapped_value) > 0) or
+                  isinstance(wrapped_value, model.W_LargePositiveInteger1Word)) and
+                 self.space.unwrap_uint(wrapped_value) != self.tag) or
+                wrapped_value is self.space.w_nil)
+
+@rstrat.strategy(generalize=[ListStrategy])
+class SmallIntegerOrFloatOrNilStrategy(SingletonStorageStrategy):
+    repr_classname = "SmallIntegerOrFloatOrNilStrategy"
+    import_from_mixin(rstrat.GenericStrategy)
+    tag = ll2f.float2longlong(sys.float_info.max)
+    nan = ll2f.float2longlong(float('nan'))
+    notnan = ~ll2f.float2longlong(float('nan'))
+    def _wrap(self, val):
+        if val == self.tag:
+            return self.space.w_nil
+        elif val & self.nan == self.nan:
+            return self.space.wrap_int(intmask(val & self.notnan))
+        else:
+            return self.space.wrap_float(ll2f.longlong2float(val))
+    def _unwrap(self, w_val):
+        if w_val is self.space.w_nil:
+            return self.tag
+        elif isinstance(w_val, model.W_SmallInteger):
+            return r_longlong(self.space.unwrap_int(w_val)) | self.nan
+        else:
+            return ll2f.float2longlong(self.space.unwrap_float(w_val))
+    def _check_can_handle(self, wrapped_value):
+        return (((isinstance(wrapped_value, model.W_SmallInteger) or
+                  isinstance(wrapped_value, model.W_Float)) and
+                 self.space.unwrap_float(wrapped_value) !=  self.tag) or
+                wrapped_value is self.space.w_nil)
+
+@rstrat.strategy(generalize=[
+    SmallIntegerOrFloatOrNilStrategy,
+    LargePositiveIntegerOrNilStrategy,
+    ListStrategy])
 class SmallIntegerOrNilStrategy(SingletonStorageStrategy):
     repr_classname = "SmallIntegerOrNilStrategy"
     import_from_mixin(rstrat.TaggingStrategy)
@@ -103,7 +157,9 @@ class SmallIntegerOrNilStrategy(SingletonStorageStrategy):
     def wrapped_tagged_value(self): return self.space.w_nil
     def unwrapped_tagged_value(self): return constants.MAXINT
 
-@rstrat.strategy(generalize=[ListStrategy])
+@rstrat.strategy(generalize=[
+    SmallIntegerOrFloatOrNilStrategy,
+    ListStrategy])
 class FloatOrNilStrategy(SingletonStorageStrategy):
     repr_classname = "FloatOrNilStrategy"
     import_from_mixin(rstrat.TaggingStrategy)
@@ -117,6 +173,7 @@ class FloatOrNilStrategy(SingletonStorageStrategy):
 @rstrat.strategy(generalize=[
     SmallIntegerOrNilStrategy,
     FloatOrNilStrategy,
+    LargePositiveIntegerOrNilStrategy,
     ListStrategy])
 class AllNilStrategy(SingletonStorageStrategy):
     repr_classname = "AllNilStrategy"

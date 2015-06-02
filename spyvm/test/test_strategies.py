@@ -1,6 +1,7 @@
 
-from spyvm import model, storage
+from spyvm import model, storage, constants
 from .util import create_space_interp, copy_to_module, cleanup_module
+from rpython.rlib.rarithmetic import r_uint
 
 def setup_module():
     space, interp = create_space_interp()
@@ -24,6 +25,11 @@ def int_arr(size):
     a.store(space, 0, space.wrap_int(12))
     return a
 
+def uint_arr(size):
+    a = arr(size)
+    a.store(space, 0, space.wrap_int(r_uint(constants.U_MAXINT-1)))
+    return a
+
 def float_arr(size):
     a = arr(size)
     a.store(space, 0, space.wrap_float(1.2))
@@ -40,6 +46,9 @@ def check_arr(arr, expected):
         elif isinstance(expected[i], float):
             assert isinstance(w_val, model.W_Float)
             assert space.unwrap_float(w_val) == expected[i]
+        elif isinstance(expected[i], long):
+            assert isinstance(w_val, model.W_LargePositiveInteger1Word)
+            assert space.unwrap_uint(w_val) == expected[i]
         else:
             assert False, "Unexpected array of expected values."
 
@@ -47,7 +56,7 @@ def check_arr(arr, expected):
 
 def test_ordered_strategies():
     strategies = space.strategy_factory.strategies
-    assert len(strategies) == 4
+    assert len(strategies) == 6
     index_nil = strategies.index(storage.AllNilStrategy)
     index_float = strategies.index(storage.FloatOrNilStrategy)
     index_int = strategies.index(storage.SmallIntegerOrNilStrategy)
@@ -148,12 +157,6 @@ def test_SmallInt_to_List():
     a.store(space, 1, arr(1))
     assert isinstance(a.strategy, storage.ListStrategy)
 
-def test_SmallInt_store_Float_to_List():
-    a = int_arr(5)
-    a.store(space, 1, space.wrap_float(2.2))
-    assert isinstance(a.strategy, storage.ListStrategy)
-    check_arr(a, [12, 2.2, w_nil, w_nil, w_nil])
-
 # ====== FloatOrNil Strategy
 
 def test_AllNil_to_Float():
@@ -193,8 +196,53 @@ def test_Float_to_List():
     a.store(space, 1, arr(1))
     assert isinstance(a.strategy, storage.ListStrategy)
 
-def test_Float_store_SmallInt_to_List():
+# ====== SmallIntegerOrFloatOrNilStrategy
+
+def test_Float_store_SmallInt():
     a = float_arr(5)
     a.store(space, 1, space.wrap_int(2))
-    assert isinstance(a.strategy, storage.ListStrategy)
+    assert isinstance(a.strategy, storage.SmallIntegerOrFloatOrNilStrategy)
     check_arr(a, [1.2, 2, w_nil, w_nil, w_nil])
+
+def test_SmallInt_store_Float():
+    a = int_arr(5)
+    a.store(space, 1, space.wrap_float(2.2))
+    assert isinstance(a.strategy, storage.SmallIntegerOrFloatOrNilStrategy)
+    check_arr(a, [12, 2.2, w_nil, w_nil, w_nil])
+
+def test_SmallFloat_to_List():
+    a = int_arr(5)
+    a.store(space, 1, space.wrap_float(2.2))
+    assert isinstance(a.strategy, storage.SmallIntegerOrFloatOrNilStrategy)
+    a.store(space, 2, arr(1))
+    assert isinstance(a.strategy, storage.ListStrategy)
+
+# ======= LargePositiveIntegerOrNilStrategy
+
+def test_AllNil_to_Large():
+    a = uint_arr(5)
+    assert isinstance(a.strategy, storage.LargePositiveIntegerOrNilStrategy)
+    check_arr(a, [constants.U_MAXINT-1, w_nil, w_nil, w_nil, w_nil])
+
+def test_SmallInt_to_Large():
+    a = int_arr(5)
+    a.store(space, 1, space.wrap_uint(r_uint(constants.U_MAXINT-2)))
+    assert isinstance(a.strategy, storage.LargePositiveIntegerOrNilStrategy)
+    check_arr(a, [12, constants.U_MAXINT-2, w_nil, w_nil, w_nil, w_nil])
+
+def test_Large_store():
+    a = uint_arr(5)
+    a.store(space, 1, space.wrap_uint(r_uint(constants.U_MAXINT-2)))
+    assert isinstance(a.strategy, storage.LargePositiveIntegerOrNilStrategy)
+    check_arr(a, [constants.U_MAXINT-1, constants.U_MAXINT-2, w_nil, w_nil, w_nil])
+
+def test_Large_store_nil_to_nil():
+    a = uint_arr(5)
+    a.store(space, 1, w_nil)
+    assert isinstance(a.strategy, storage.LargePositiveIntegerOrNilStrategy)
+    check_arr(a, [constants.U_MAXINT-1, w_nil, w_nil, w_nil, w_nil])
+
+def test_Large_to_List():
+    a = uint_arr(5)
+    a.store(space, 1, arr(1))
+    assert isinstance(a.strategy, storage.ListStrategy)
