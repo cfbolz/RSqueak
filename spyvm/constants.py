@@ -208,5 +208,6 @@ SIMULATION_SELECTORS = {
     'simulateCopyBits': 'w_simulateCopyBits',
     'copyBitsSimulated': 'w_copyBitsSimulated',
     'warpBitsSimulated:sourceMap:': 'w_warpBitsSimulated',
-    'simulateBalloonPrimitive:args:': 'w_simulateBalloonPrimitive'
+    'simulateBalloonPrimitive:args:': 'w_simulateBalloonPrimitive',
+    'numTemps': 'w_numTemps'
 }
