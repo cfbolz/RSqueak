@@ -1588,9 +1588,24 @@ CTXT_AT = 210
 CTXT_AT_PUT = 211
 CTXT_SIZE = 212
 
+@expose_primitive(CTXT_SIZE, unwrap_spec=[object])
+def func(interp, s_frame, w_rcvr):
+    #from spyvm.interpreter import Return
+    from spyvm.error import MethodNotFound
+    try:
+        num_temps = s_frame._sendSelector(interp.image.w_numTemps, 0, interp, w_rcvr,
+                                          w_rcvr.class_shadow(interp.space))
+        if isinstance(num_temps, model.W_SmallInteger):
+            return interp.space.wrap_int(num_temps.value + 1)
+        else:
+            # implementation of numTemps is broken or primitive called on object different from context
+            return interp.space.wrap_int(0)
+        #s_frame._sendSelfSelector(w_selector, argcount, interp)
+    except MethodNotFound:
+        return interp.space.wrap_int(0)
+
 prim_table[CTXT_AT] = prim_table[AT]
 prim_table[CTXT_AT_PUT] = prim_table[AT_PUT]
-prim_table[CTXT_SIZE] = prim_table[SIZE]
 # ___________________________________________________________________________
 # Drawing
 
