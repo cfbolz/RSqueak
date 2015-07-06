@@ -20,8 +20,12 @@ class ClassShadow(AbstractCachingShadow):
     (i.e. used as the class of another Smalltalk object).
     """
 
-    _attrs_ = ["name", "_instance_size", "instance_varsized", "instance_kind",
-                "_s_methoddict", "_s_superclass", "subclass_s"]
+    _attrs_ = ["name", "_instance_size", "instance_varsized",
+               "instance_kind", "_s_methoddict", "_s_superclass",
+               "subclass_s"]
+    _immutable_fields_ = ["_instance_size?", "instance_varsized?",
+                          "instance_kind?", "_s_methoddict?",
+                          "_s_superclass?"]
     name = '??? (incomplete class info)'
     _s_superclass = _s_methoddict = None
     provides_getname = True
@@ -256,7 +260,7 @@ class ClassShadow(AbstractCachingShadow):
             w_method.compiledin_class = self.w_self()
 
 class MethodDictionaryShadow(AbstractGenericShadow):
-    _immutable_fields_ = ['s_class']
+    _immutable_fields_ = ['methoddict?', 's_class']
     _attrs_ = ['methoddict', 's_class']
     repr_classname = "MethodDictionaryShadow"
 

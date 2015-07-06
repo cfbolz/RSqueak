@@ -27,6 +27,7 @@ class Return(Exception):
 
 class NonVirtualReturn(Exception):
     _attrs_ = ["s_target_context", "s_current_context", "value"]
+    _immutable_fields_ = ["s_target_context", "s_current_context", "value"]
     def __init__(self, s_target_context, s_current_context, w_result):
         self.value = w_result
         self.s_target_context = s_target_context
@@ -39,6 +40,7 @@ class ContextSwitchException(Exception):
     """General Exception that causes the interpreter to leave
     the current context."""
     _attrs_ = ["s_new_context"]
+    _immutable_fields_ = ["s_new_context"]
     type = "ContextSwitch"
     def __init__(self, s_new_context):
         self.s_new_context = s_new_context

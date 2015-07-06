@@ -456,6 +456,7 @@ class W_LargePositiveInteger1Word(W_AbstractObjectWithIdentityHash):
 class W_Float(W_AbstractObjectWithIdentityHash):
     """Boxed float value."""
     _attrs_ = ['value']
+    _immutable_fields_ = ['value?']
     repr_classname = "W_Float"
 
     def fillin_fromwords(self, space, high, low):
@@ -628,7 +629,7 @@ class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
     #@signature(signature.types.self(), signature.type.any(),
     #           returns=signature.types.instance(ClassShadow))
     def class_shadow(self, space):
-        w_class = self.w_class
+        w_class = jit.promote(self.w_class)
         assert w_class is not None
         return w_class.as_class_get_shadow(space)
 
