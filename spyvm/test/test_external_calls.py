@@ -29,7 +29,7 @@ def prim(code, stack, context = None):
     return _prim(space, code, stack, context)
 
 def external_call(module_name, method_name, stack):
-    w_description = model.W_PointersObject(space, space.classtable['w_Array'], 2)
+    w_description = model.W_GenericPointersObject(space, space.classtable['w_Array'], 2)
     w_description.atput0(space, 0, space.w(module_name))
     w_description.atput0(space, 1, space.w(method_name))
     context = new_frame("<not called>", [w_description], stack[0], stack[1:])[0]

@@ -16,7 +16,7 @@ def setup_module():
 def teardown_module():
     cleanup_module(__name__)
 
-class MockFrame(model.W_PointersObject):
+class MockFrame(model.W_GenericPointersObject):
     def __init__(self, space, stack):
         self.w_class = space.w_BlockContext
         size = 6 + len(stack) + 6
@@ -734,7 +734,7 @@ def test_primitive_value_no_context_switch(monkeypatch):
 
 def test_primitive_be_display():
     assert space.objtable["w_display"] is None
-    mock_display = model.W_PointersObject(space, space.w_Point, 4)
+    mock_display = model.W_SmallPointersObject(space, space.w_Point, 4)
     w_wordbmp = model.W_WordsObject(space, space.w_Array, 10)
     mock_display.store(space, 0, w_wordbmp) # bitmap
     mock_display.store(space, 1, space.wrap_int(32)) # width
@@ -748,7 +748,7 @@ def test_primitive_be_display():
     sdldisplay = w_bitmap.display
     assert isinstance(sdldisplay, display.SDLDisplay)
 
-    mock_display2 = model.W_PointersObject(space, space.w_Point, 4)
+    mock_display2 = model.W_SmallPointersObject(space, space.w_Point, 4)
     mock_display2.store(space, 0, model.W_WordsObject(space, space.w_Array, 10)) # bitmap
     mock_display2.store(space, 1, space.wrap_int(32)) # width
     mock_display2.store(space, 2, space.wrap_int(10)) # height
@@ -766,7 +766,7 @@ def test_primitive_be_display():
     assert mock_display.fetch(space, 0) is w_bitmap
 
 def test_primitive_force_display_update(monkeypatch):
-    mock_display = model.W_PointersObject(space, space.w_Point, 4)
+    mock_display = model.W_SmallPointersObject(space, space.w_Point, 4)
     w_wordbmp = model.W_WordsObject(space, space.w_Array, 10)
     mock_display.store(space, 0, w_wordbmp) # bitmap
     mock_display.store(space, 1, space.wrap_int(32)) # width

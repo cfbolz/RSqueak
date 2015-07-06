@@ -50,6 +50,7 @@ def create_space(bootstrap = bootstrap_by_default):
     space = BootstrappedObjSpace()
     if bootstrap:
         space.bootstrap()
+    space.uses_block_contexts.activate()
     return space
 
 def create_space_interp(bootstrap = bootstrap_by_default):
@@ -262,7 +263,7 @@ class BootstrappedObjSpace(objspace.ObjSpace):
 
         # Bootstrap character table
         for i in range(256):
-            w_cinst = model.W_PointersObject(self, self.w_Character, 1)
+            w_cinst = model.W_SmallPointersObject(self, self.w_Character, 1)
             w_cinst.store(self, constants.CHARACTER_VALUE_INDEX, model.W_SmallInteger(i))
             self.w_charactertable.store(self, i, w_cinst)
 
@@ -286,7 +287,7 @@ class BootstrappedObjSpace(objspace.ObjSpace):
 
     def bootstrap_class(self, instsize, w_superclass=None, w_metaclass=None,
                         name='?', format=storage_classes.POINTERS, varsized=False):
-        w_class = model.W_PointersObject(self, w_metaclass, 0)
+        w_class = model.W_GenericPointersObject(self, w_metaclass, 0)
         self.patch_class(w_class, instsize, w_superclass, w_metaclass, name, format, varsized)
         return w_class
 
@@ -346,7 +347,7 @@ class BootstrappedObjSpace(objspace.ObjSpace):
         w_method.argsize=numargs
         w_method._tempsize=8
         if literals is None:
-            literals = [model.W_PointersObject(self, None, 2)]
+            literals = [model.W_SmallPointersObject(self, None, 2)]
         w_method.setliterals(literals)
         return w_method
 

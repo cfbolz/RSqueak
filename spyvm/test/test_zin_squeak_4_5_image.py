@@ -78,7 +78,7 @@ def test_ContextPart_jump():
            0xc9, 0x82, 0xc0, 0x40, 0x7c] # Send value and return
 
     Association = space.classtable["w_Point"] # Wrong class, doesn't matter.
-    assoc = model.W_PointersObject(space, Association, 2)
+    assoc = model.W_SmallPointersObject(space, Association, 2)
     assoc.store(space, 0, w('a'))
     assoc.store(space, 1, w(3))
     w_method = space.make_method(bytes, [assoc, w(5), push, sender, jump, w(10)])
@@ -112,10 +112,10 @@ def test_ContextPart_jump_nonlocal():
                0xc9, 0x82, 0xc0, 0x40, 0x7c] # Send value and return
 
     Association = space.classtable["w_Point"] # Wrong class, doesn't matter.
-    assoc = model.W_PointersObject(space, Association, 2)
+    assoc = model.W_SmallPointersObject(space, Association, 2)
     assoc.store(space, 0, w('a'))
     assoc.store(space, 1, space.w_nil)
-    assoc2 = model.W_PointersObject(space, Association, 2)
+    assoc2 = model.W_SmallPointersObject(space, Association, 2)
     assoc2.store(space, 0, w('outer'))
     assoc2.store(space, 1, space.w_nil)
     w_method = space.make_method(bytes, [assoc, w(5), assoc2, push, jump, w(10)])
@@ -143,13 +143,13 @@ def test_contextOn_do_():
     ]
 
     Association = space.classtable["w_Point"] # Wrong class, doesn't matter.
-    ctxAssoc = model.W_PointersObject(space, Association, 2)
+    ctxAssoc = model.W_SmallPointersObject(space, Association, 2)
     ctxAssoc.store(space, 0, w('ctx'))
     ctxAssoc.store(space, 1, space.w_nil)
-    contextPartAssoc = model.W_PointersObject(space, Association, 2)
+    contextPartAssoc = model.W_SmallPointersObject(space, Association, 2)
     contextPartAssoc.store(space, 0, w('ContextPart'))
     contextPartAssoc.store(space, 1, ContextPart)
-    errorAssoc = model.W_PointersObject(space, Association, 2)
+    errorAssoc = model.W_SmallPointersObject(space, Association, 2)
     errorAssoc.store(space, 0, w('Point'))
     errorAssoc.store(space, 1, Association)
     w_method = space.make_method(bytes, [ctxAssoc, contextOnDo, contextPartAssoc, errorAssoc, w('nothing')])

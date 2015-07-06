@@ -12,7 +12,7 @@ def teardown_module():
     cleanup_module(__name__)
 
 def test_simpleread():
-    w_o = model.W_PointersObject(space, None, 2)
+    w_o = model.W_SmallPointersObject(space, None, 2)
     w = wrapper.Wrapper(space, w_o)
     w_o.store(space, 0, "hello")
     assert w.read(0) == "hello"
@@ -22,7 +22,7 @@ def test_simpleread():
     py.test.raises(WrapperException, "w.write(2, \"test\")")
 
 def test_accessor_generators():
-    w_o = model.W_PointersObject(space, None, 1)
+    w_o = model.W_SmallPointersObject(space, None, 1)
     w = wrapper.LinkWrapper(space, w_o)
     w_o.store(space, 0, "hello")
     assert w.next_link() == "hello"
@@ -30,12 +30,12 @@ def test_accessor_generators():
     assert w.next_link() == "boe"
 
 def link(w_next='foo'):
-    w_object = model.W_PointersObject(space, None, 1)
+    w_object = model.W_SmallPointersObject(space, None, 1)
     wrapper.LinkWrapper(space, w_object).store_next_link(w_next)
     return w_object
 
 def test_linked_list():
-    w_object = model.W_PointersObject(space, None,2)
+    w_object = model.W_SmallPointersObject(space, None,2)
     w_last = link(space.w_nil)
     w_lb1 = link(w_last)
     w_lb2 = link(w_lb1)
@@ -80,7 +80,7 @@ def new_process(w_next=None,
     if w_suspended_context is None:
         w_suspended_context = space.w_nil
     w_priority = space.wrap_int(priority)
-    w_process = model.W_PointersObject(space, None, 4)
+    w_process = model.W_SmallPointersObject(space, None, 4)
     process = wrapper.ProcessWrapper(space, w_process)
     process.store_next_link(w_next)
     process.store_my_list(w_my_list)
@@ -89,7 +89,7 @@ def new_process(w_next=None,
     return process
 
 def new_processlist(processes_w=[]):
-    w_processlist = model.W_PointersObject(space, None, 2)
+    w_processlist = model.W_SmallPointersObject(space, None, 2)
     w_first = space.w_nil
     w_last = space.w_nil
     for w_process in processes_w[::-1]:
@@ -107,7 +107,7 @@ def new_prioritylist(prioritydict=None):
     else:
         maxpriority = 5
         prioritydict = {}
-    w_prioritylist = model.W_PointersObject(space, None, maxpriority)
+    w_prioritylist = model.W_GenericPointersObject(space, None, maxpriority)
     prioritylist = wrapper.Wrapper(space, w_prioritylist)
     for i in range(maxpriority):
         prioritylist.write(i, new_processlist(prioritydict.get(i, [])).wrapped)
@@ -118,14 +118,14 @@ def new_scheduler(w_process=None, prioritydict=None):
     if w_process is None:
         w_process = space.w_nil
     priority_list = new_prioritylist(prioritydict)
-    w_scheduler = model.W_PointersObject(space, None, 2)
+    w_scheduler = model.W_SmallPointersObject(space, None, 2)
     scheduler = wrapper.SchedulerWrapper(space, w_scheduler)
     scheduler.store_active_process(w_process)
     scheduler.write(0, priority_list.wrapped)
     return scheduler
 
 def new_semaphore(excess_signals=0):
-    w_semaphore = model.W_PointersObject(space, None, 3)
+    w_semaphore = model.W_SmallPointersObject(space, None, 3)
     semaphore = wrapper.SemaphoreWrapper(space, w_semaphore)
     semaphore.store_excess_signals(excess_signals)
     return semaphore

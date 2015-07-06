@@ -16,7 +16,7 @@ from spyvm import constants, error
 from spyvm.util.version import constant_for_version, constant_for_version_arg, VersionMixin, Version
 
 from rpython.rlib import rrandom, objectmodel, jit, signature, longlong2float
-from rpython.rlib.rarithmetic import intmask, r_uint, r_int, ovfcheck, r_longlong
+from rpython.rlib.rarithmetic import intmask, r_uint, r_int, ovfcheck, r_longlong, int_between
 from rpython.rlib.debug import make_sure_not_resized
 from rpython.tool.pairtype import extendabletype
 from rpython.rlib.objectmodel import instantiate, compute_hash, import_from_mixin, we_are_translated
@@ -603,8 +603,8 @@ class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
 
     def guess_classname(self):
         if self.has_class():
-            if self.w_class.has_space():
-                class_shadow = self.class_shadow(self.w_class.space())
+            if self.w_class.has_strategy():
+                class_shadow = self.class_shadow(self.space())
                 return class_shadow.name
             else:
                 # We cannot access the class during the initialization sequence.
@@ -635,19 +635,231 @@ class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
 
 class W_PointersObject(W_AbstractObjectWithClassReference):
     """Common object."""
-    _attrs_ = ['strategy', '_storage']
-    # TODO -- is it viable to have these as pseudo-immutable?
-    # Measurably increases performance, since they do change rarely.
-    _immutable_attrs_ = ['strategy?', '_storage?']
-    strategy = None
+    _attrs_ = ["_space"]
+    _immutable_fields_ = ["_space"]
     repr_classname = "W_PointersObject"
-    rstrat.make_accessors(strategy='strategy', storage='_storage')
 
-    @jit.unroll_safe
     def __init__(self, space, w_class, size, weak=False):
         """Create new object with size = fixed + variable size."""
         W_AbstractObjectWithClassReference.__init__(self, space, w_class)
+        self._space = space
         self._initialize_storage(space, size, weak)
+
+    def _initialize_storage(self, space, size, weak=False):
+        pass
+
+    def is_weak(self):
+        return False
+
+    def fillin_weak(self, space, g_self):
+        raise NotImplementedError
+
+    def space(self):
+        return self._space
+
+    @jit.look_inside_iff(lambda self, space: jit.isconstant(self.size()))
+    def fetch_all(self, space):
+        return [self.fetch(space, i) for i in range(self.size())]
+
+    @jit.look_inside_iff(lambda self, space, collection: len(collection) < 64)
+    def store_all(self, space, collection):
+        # Be tolerant: copy over as many elements as possible, set rest to nil.
+        # The size of the object cannot be changed in any case.
+        # TODO use store_all() provided by strategy?
+        my_length = self.size()
+        incoming_length = min(my_length, len(collection))
+        i = 0
+        while i < incoming_length:
+            self.store(space, i, collection[i])
+            i = i+1
+        while i < my_length:
+            self.store(space, i, space.w_nil)
+            i = i+1
+
+    def at0(self, space, index0):
+        # To test, at0 = in varsize part
+        return self.fetch(space, index0 + self.instsize())
+
+    def atput0(self, space, index0, w_value):
+        # To test, at0 = in varsize part
+        self.store(space, index0 + self.instsize(), w_value)
+
+    def fetch(self, space, n0):
+        raise NotImplementedError
+
+    def store(self, space, n0, w_value):
+        raise NotImplementedError
+
+    def unwrap_char(self, space):
+        w_class = self.getclass(space)
+        if not w_class.is_same_object(space.w_Character):
+            raise error.UnwrappingError("expected Character")
+        w_ord = self.fetch(space, constants.CHARACTER_VALUE_INDEX)
+        if not isinstance(w_ord, W_SmallInteger):
+            raise error.UnwrappingError("expected SmallInteger from Character")
+        return chr(w_ord.value)
+
+    @objectmodel.specialize.arg(2)
+    def as_special_get_shadow(self, space, TheClass):
+        raise NotImplementedError
+
+    def as_class_get_shadow(self, space):
+        from spyvm.storage_classes import ClassShadow
+        return jit.promote(self.as_special_get_shadow(space, ClassShadow))
+
+    def as_context_get_shadow(self, space):
+        from spyvm.storage_contexts import ContextPartShadow
+        return self.as_special_get_shadow(space, ContextPartShadow)
+
+    def as_methoddict_get_shadow(self, space):
+        from spyvm.storage_classes import MethodDictionaryShadow
+        return self.as_special_get_shadow(space, MethodDictionaryShadow)
+
+    def as_cached_object_get_shadow(self, space):
+        from spyvm.storage import CachedObjectShadow
+        return self.as_special_get_shadow(space, CachedObjectShadow)
+
+    def as_observed_get_shadow(self, space):
+        from spyvm.storage import ObserveeShadow
+        return self.as_special_get_shadow(space, ObserveeShadow)
+
+
+class W_PointersObjectNoFields(W_PointersObject):
+    repr_classname = "W_PointersObjectNoFields"
+    def fetch_all(self, space):
+        return []
+
+    def store_all(self, space, collection):
+        pass
+
+    def fetch(self, space, n0):
+        raise IndexError
+
+    def store(self, space, n0, w_value):
+        raise IndexError
+
+    def size(self):
+        return 0
+
+    def instsize(self):
+        return 0
+
+    def _become(self, w_other):
+        assert isinstance(w_other, W_PointersObjectNoFields)
+        # Only one strategy will handle the become (or none of them).
+        # The receivers strategy gets the first shot.
+        # If it doesn't want to, let the w_other's strategy handle it.
+        W_AbstractObjectWithClassReference._become(self, w_other)
+
+    def clone(self, space):
+        return W_PointersObjectNoFields(space, self.getclass(space), 0)
+
+
+class W_SmallPointersObject(W_PointersObject):
+    repr_classname = "W_SmallPointersObject"
+    _attrs_ = ["f1", "f2", "f3", "f4", "_size", "shadow"]
+    _immutable_fields_ = ["size"]
+
+    def _initialize_storage(self, space, size, weak=False):
+        assert weak == False
+        self.shadow = None
+        self._size = size
+        self.f1 = space.w_nil
+        self.f2 = space.w_nil
+        self.f3 = space.w_nil
+        self.f4 = space.w_nil
+
+    def fillin(self, space, g_self):
+        W_PointersObject.fillin(self, space, g_self)
+        # Recursive fillin required to enable specialized storage strategies.
+        for g_obj in g_self.pointers:
+            g_obj.fillin(space)
+        pointers = g_self.get_pointers()
+        assert len(pointers) < 5
+        assert g_self.size < 5
+        self._size = g_self.size
+        self.shadow = None
+        self.f1 = space.w_nil
+        self.f2 = space.w_nil
+        self.f3 = space.w_nil
+        self.f4 = space.w_nil
+        try:
+            self.f1 = pointers[0]
+            self.f2 = pointers[1]
+            self.f3 = pointers[2]
+            self.f4 = pointers[3]
+        except IndexError:
+            pass
+
+    def fetch(self, space, index0):
+        if not int_between(0, index0, self.size()):
+            raise IndexError
+        if index0 == 0: return self.f1
+        elif index0 == 1: return self.f2
+        elif index0 == 2: return self.f3
+        elif index0 == 3: return self.f4
+        else: raise IndexError
+
+    def store(self, space, index0, w_value):
+        if not int_between(0, index0, self.size()):
+            raise IndexError
+        if self.shadow is not None:
+            self.shadow.store(self, index0, w_value)
+        if index0 == 0: self.f1 = w_value
+        elif index0 == 1: self.f2 = w_value
+        elif index0 == 2: self.f3 = w_value
+        elif index0 == 3: self.f4 = w_value
+        else: raise IndexError
+
+    def size(self):
+        return self._size
+
+    def instsize(self):
+        return self.size()
+
+    @objectmodel.specialize.arg(2)
+    def as_special_get_shadow(self, space, TheClass):
+        shadow = self.shadow
+        if not isinstance(shadow, TheClass):
+            shadow = TheClass(space, self, self.size())
+        assert isinstance(shadow, TheClass)
+        self.shadow = shadow
+        return shadow
+
+    def _become(self, w_other):
+        assert isinstance(w_other, W_SmallPointersObject)
+        # Only one strategy will handle the become (or none of them).
+        # The receivers strategy gets the first shot.
+        # If it doesn't want to, let the w_other's strategy handle it.
+        if self.shadow and self.shadow.handles_become():
+            self.shadow.become(w_other)
+        elif w_other.shadow and w_other.shadow.handles_become():
+            w_other.shadow.become(self)
+        self.shadow, w_other.shadow = w_other.shadow, self.shadow
+        self._size, w_other._size = w_other._size, self._size
+        self.f1, w_other.f1 = w_other.f1, self.f1
+        self.f2, w_other.f2 = w_other.f2, self.f2
+        self.f3, w_other.f3 = w_other.f3, self.f3
+        self.f4, w_other.f4 = w_other.f4, self.f4
+        W_AbstractObjectWithClassReference._become(self, w_other)
+
+    @jit.unroll_safe
+    def clone(self, space):
+        my_pointers = self.fetch_all(space)
+        w_result = W_SmallPointersObject(space, self.getclass(space), len(my_pointers))
+        w_result.store_all(space, my_pointers)
+        w_result.shadow = self.shadow
+        return w_result
+
+
+class W_GenericPointersObject(W_PointersObject):
+    _attrs_ = ['strategy', '_storage']
+    # TODO -- is it viable to have these as pseudo-immutable?
+    # Measurably increases performance, since they do change rarely.
+    # _immutable_attrs_ = ['strategy?', '_storage?']
+    strategy = None
+    repr_classname = "W_GenericPointersObject"
+    rstrat.make_accessors(strategy='strategy', storage='_storage')
 
     def _initialize_storage(self, space, size, weak=False):
         storage_type = space.strategy_factory.empty_storage_type(self, size, weak)
@@ -687,9 +899,6 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
         assert strategy, "The strategy has not been initialized yet!"
         return strategy
 
-    def space(self):
-        return self.assert_strategy().space
-
     def __str__(self):
         if self.has_strategy() and self.strategy.provides_getname:
             return self._get_strategy().getname()
@@ -705,48 +914,12 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
                 name = " [%s]" % self._get_strategy().getname()
         return '(%s) len=%d%s' % (strategy_info, self.size(), name)
 
-    def unwrap_char(self, space):
-        w_class = self.getclass(space)
-        if not w_class.is_same_object(space.w_Character):
-            raise error.UnwrappingError("expected Character")
-        w_ord = self.fetch(space, constants.CHARACTER_VALUE_INDEX)
-        if not isinstance(w_ord, W_SmallInteger):
-            raise error.UnwrappingError("expected SmallInteger from Character")
-        return chr(w_ord.value)
-
     @jit.look_inside_iff(lambda self, w_array: jit.isconstant(self.size()))
     def unwrap_array(self, space):
         # Check that our argument has pointers format and the class:
         if not self.getclass(space).is_same_object(space.w_Array):
             raise error.UnwrappingError
         return [self.at0(space, i) for i in range(self.size())]
-
-    @jit.look_inside_iff(lambda self, space: jit.isconstant(self.size()))
-    def fetch_all(self, space):
-        return [self.fetch(space, i) for i in range(self.size())]
-
-    @jit.look_inside_iff(lambda self, space, collection: len(collection) < 64)
-    def store_all(self, space, collection):
-        # Be tolerant: copy over as many elements as possible, set rest to nil.
-        # The size of the object cannot be changed in any case.
-        # TODO use store_all() provided by strategy?
-        my_length = self.size()
-        incoming_length = min(my_length, len(collection))
-        i = 0
-        while i < incoming_length:
-            self.store(space, i, collection[i])
-            i = i+1
-        while i < my_length:
-            self.store(space, i, space.w_nil)
-            i = i+1
-
-    def at0(self, space, index0):
-        # To test, at0 = in varsize part
-        return self.fetch(space, index0 + self.instsize())
-
-    def atput0(self, space, index0, w_value):
-        # To test, at0 = in varsize part
-        self.store(space, index0 + self.instsize(), w_value)
 
     def fetch(self, space, n0):
         return self._get_strategy().fetch(self, n0)
@@ -768,7 +941,18 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
         self.strategy = strategy
 
     def _get_strategy(self):
-        return self.strategy
+        from spyvm.storage import ListStrategy
+        if isinstance(self.strategy, ListStrategy):
+            return jit.promote(self.strategy)
+        else:
+            return self.strategy
+
+    def _get_storage(self):
+        from spyvm.storage import ListStrategy
+        if isinstance(self.strategy, ListStrategy):
+            return jit.promote(self._storage)
+        else:
+            return self._storage
 
     @objectmodel.specialize.arg(2)
     def as_special_get_shadow(self, space, TheClass):
@@ -778,41 +962,17 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
         assert isinstance(shadow, TheClass)
         return shadow
 
-    def as_class_get_shadow(self, space):
-        from spyvm.storage_classes import ClassShadow
-        return jit.promote(self.as_special_get_shadow(space, ClassShadow))
-
-    def as_context_get_shadow(self, space):
-        from spyvm.storage_contexts import ContextPartShadow
-        return self.as_special_get_shadow(space, ContextPartShadow)
-
-    def as_methoddict_get_shadow(self, space):
-        from spyvm.storage_classes import MethodDictionaryShadow
-        return self.as_special_get_shadow(space, MethodDictionaryShadow)
-
-    def as_cached_object_get_shadow(self, space):
-        from spyvm.storage import CachedObjectShadow
-        return self.as_special_get_shadow(space, CachedObjectShadow)
-
-    def as_observed_get_shadow(self, space):
-        from spyvm.storage import ObserveeShadow
-        return self.as_special_get_shadow(space, ObserveeShadow)
-
     def has_strategy(self):
         return self._get_strategy() is not None
 
-    def has_space(self):
-        # The space is accessed through the strategy.
-        return self.has_strategy()
-
     def _become(self, w_other):
-        assert isinstance(w_other, W_PointersObject)
+        assert isinstance(w_other, W_GenericPointersObject)
         # Only one strategy will handle the become (or none of them).
         # The receivers strategy gets the first shot.
         # If it doesn't want to, let the w_other's strategy handle it.
         if self.has_strategy() and self._get_strategy().handles_become():
             self.strategy.become(w_other)
-        elif self.has_strategy() and self._get_strategy().handles_become():
+        elif w_other.has_strategy() and w_other._get_strategy().handles_become():
             w_other.strategy.become(self)
         self.strategy, w_other.strategy = w_other.strategy, self.strategy
         self._storage, w_other._storage = w_other._storage, self._storage
@@ -821,7 +981,7 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
     @jit.unroll_safe
     def clone(self, space):
         my_pointers = self.fetch_all(space)
-        w_result = W_PointersObject(space, self.getclass(space), len(my_pointers))
+        w_result = W_GenericPointersObject(space, self.getclass(space), len(my_pointers))
         w_result.store_all(space, my_pointers)
         return w_result
 
@@ -892,7 +1052,7 @@ class W_BytesObject(W_AbstractObjectWithClassReference):
         return self._size
 
     def str_content(self):
-        if self.has_class() and self.w_class.has_space():
+        if self.has_class() and self.w_class.has_strategy():
             if self.w_class.space().omit_printing_raw_bytes.is_set():
                 return "<omitted>"
         return "'%s'" % self.unwrap_string(None).replace('\r', '\n')
@@ -1314,7 +1474,7 @@ class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
         literals = self.literals
         if literals and len(literals) > 0:
             w_literal = literals[-1]
-            if isinstance(w_literal, W_PointersObject) and w_literal.has_space():
+            if isinstance(w_literal, W_PointersObject):
                 space = w_literal.space() # Not pretty to steal the space from another object.
                 compiledin_class = None
                 if w_literal.is_class(space):
@@ -1402,7 +1562,7 @@ class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
 
     def guess_containing_classname(self):
         w_class = self.compiled_in()
-        if w_class and w_class.has_space():
+        if w_class and w_class.has_strategy():
             # Not pretty to steal the space from another object.
             return w_class.as_class_get_shadow(w_class.space()).getname()
         return "? (no compiledin-info)"
@@ -1416,7 +1576,7 @@ class W_CompiledMethod(W_AbstractObjectWithIdentityHash):
         # This has the same functionality as get_identifier_string, but without calling any
         # methods in order to avoid side effects that prevent translation.
         w_class = self.safe_compiled_in()
-        if isinstance(w_class, W_PointersObject):
+        if isinstance(w_class, W_GenericPointersObject):
             from spyvm.storage_classes import ClassShadow
             s_class = w_class.strategy
             if isinstance(s_class, ClassShadow):

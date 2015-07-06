@@ -12,7 +12,7 @@ def teardown_module():
     cleanup_module(__name__)
 
 def arr(size):
-    return model.W_PointersObject(space, class_Array, size)
+    return model.W_GenericPointersObject(space, class_Array, size)
 
 def list_arr(size):
     a = arr(size)

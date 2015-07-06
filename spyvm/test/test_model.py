@@ -123,7 +123,12 @@ def test_compiledin_class():
     assert classshadow.lookup(w_foo).compiled_in() is w_super
 
 def new_object(size=0):
-    return model.W_PointersObject(space, None, size)
+    if size == 0:
+        return model.W_PointersObjectNoFields(space, None, size)
+    elif size < 5:
+        return model.W_SmallPointersObject(space, None, size)
+    else:
+        return model.W_GenericPointersObject(space, None, size)
 
 def test_compiledin_class_assoc():
     val = bootstrap_class(0)
@@ -197,7 +202,7 @@ def test_compiledmethod_atput0_not_aligned():
 
 def test_is_same_object(w_o1=None, w_o2=None):
     if w_o1 is None:
-        w_o1 = model.W_PointersObject(space, None, 0)
+        w_o1 = model.W_PointersObjectNoFields(space, None, 0)
     if w_o2 is None:
         w_o2 = w_o1
     assert w_o1.is_same_object(w_o2)
@@ -205,9 +210,9 @@ def test_is_same_object(w_o1=None, w_o2=None):
 
 def test_not_is_same_object(w_o1=None,w_o2=None):
     if w_o1 is None:
-        w_o1 = model.W_PointersObject(space, None, 0)
+        w_o1 = model.W_PointersObjectNoFields(space, None, 0)
     if w_o2 is None:
-        w_o2 = model.W_PointersObject(space, None,0)
+        w_o2 = model.W_PointersObjectNoFields(space, None,0)
     assert not w_o1.is_same_object(w_o2)
     assert not w_o2.is_same_object(w_o1)
     w_o2 = model.W_SmallInteger(2)

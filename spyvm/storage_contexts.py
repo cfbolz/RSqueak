@@ -557,7 +557,7 @@ class __extend__(ContextPartShadow):
     @staticmethod
     def build_block_context(space, s_home, argcnt, pc):
         size = s_home.own_size() - s_home.tempsize()
-        w_self = model.W_PointersObject(space, space.w_BlockContext, size)
+        w_self = model.W_GenericPointersObject(space, space.w_BlockContext, size)
 
         ctx = ContextPartShadow(space, w_self, size)
         ctx.is_block_context = True
@@ -799,7 +799,7 @@ class __extend__(ContextPartShadow):
             return self._w_self
         else:
             space = self.space
-            w_self = model.W_PointersObject(space, space.w_MethodContext, self._w_self_size)
+            w_self = model.W_GenericPointersObject(space, space.w_MethodContext, self._w_self_size)
             w_self.store_strategy(self)
             self._w_self = w_self
             return w_self

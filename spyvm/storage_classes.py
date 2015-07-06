@@ -159,7 +159,12 @@ class ClassShadow(AbstractCachingShadow):
         w_cls = self.w_self()
         if self.instance_kind == POINTERS:
             size = self.instsize() + extrasize
-            w_new = model.W_PointersObject(self.space, w_cls, size)
+            if not self.isvariable() and size == 0:
+                w_new = model.W_PointersObjectNoFields(self.space, w_cls, size)
+            elif not self.isvariable() and size < 5:
+                w_new = model.W_SmallPointersObject(self.space, w_cls, size)
+            else:
+                w_new = model.W_GenericPointersObject(self.space, w_cls, size)
         elif self.instance_kind == WORDS:
             w_new = model.W_WordsObject(self.space, w_cls, extrasize)
         elif self.instance_kind == BYTES:
@@ -175,7 +180,7 @@ class ClassShadow(AbstractCachingShadow):
                 w_new = model.W_BytesObject(self.space, w_cls, extrasize)
         elif self.instance_kind == WEAK_POINTERS:
             size = self.instsize() + extrasize
-            w_new = model.W_PointersObject(self.space, w_cls, size, weak=True)
+            w_new = model.W_GenericPointersObject(self.space, w_cls, size, weak=True)
         else:
             raise NotImplementedError(self.instance_kind)
         return w_new
@@ -247,8 +252,8 @@ class ClassShadow(AbstractCachingShadow):
     def initialize_methoddict(self):
         "NOT_RPYTHON"     # this is only for testing.
         if self._s_methoddict is None:
-            w_methoddict = model.W_PointersObject(self.space, None, 2)
-            w_methoddict.store(self.space, constants.METHODDICT_VALUES_INDEX, model.W_PointersObject(self.space, None, 0))
+            w_methoddict = model.W_SmallPointersObject(self.space, None, 2)
+            w_methoddict.store(self.space, constants.METHODDICT_VALUES_INDEX, model.W_PointersObjectNoFields(self.space, None, 0))
             self.store_s_methoddict(w_methoddict.as_methoddict_get_shadow(self.space))
 
     def installmethod(self, w_selector, w_method):
@@ -305,7 +310,7 @@ class MethodDictionaryShadow(AbstractGenericShadow):
         self.w_values().as_observed_get_shadow(self.space).set_observer(self)
 
     def w_values(self):
-        w_values = self.own_fetch(constants.METHODDICT_VALUES_INDEX)
+        w_values = self._w_self.fetch(self.space, constants.METHODDICT_VALUES_INDEX)
         assert isinstance(w_values, model.W_PointersObject)
         return w_values
 
@@ -313,14 +318,14 @@ class MethodDictionaryShadow(AbstractGenericShadow):
         self.sync_method_cache()
 
     def sync_method_cache(self):
-        size = self.own_size()
+        size = self._w_self.size()
         if size == 0:
             return
         self.methoddict = {}
         size -= constants.METHODDICT_NAMES_INDEX
         w_values = self.w_values()
         for i in range(size):
-            w_selector = self.own_fetch(constants.METHODDICT_NAMES_INDEX+i)
+            w_selector = self._w_self.fetch(self.space, constants.METHODDICT_NAMES_INDEX+i)
             if not w_selector.is_nil(self.space):
                 if isinstance(w_selector, model.W_BytesObject):
                     selector = w_selector.unwrap_string(None)

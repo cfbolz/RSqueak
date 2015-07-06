@@ -42,7 +42,7 @@ def build_smalltalk_class(name, format, w_superclass=None,
                                                w_Metaclass)
     w_methoddict = build_methoddict(methods)
     size = constants.CLASS_NAME_INDEX + 1
-    w_class = model.W_PointersObject(space, w_classofclass, size)
+    w_class = model.W_GenericPointersObject(space, w_classofclass, size)
     w_class.store(space, constants.CLASS_SUPERCLASS_INDEX, w_superclass)
     w_class.store(space, constants.CLASS_METHODDICT_INDEX, w_methoddict)
     w_class.store(space, constants.CLASS_FORMAT_INDEX, space.wrap_int(format))
@@ -95,7 +95,7 @@ def methodcontext(w_sender=None, pc=13, stackpointer=0, stacksize=5,
         w_sender = space.w_nil
     if method is None:
         method = create_method()
-    w_object = model.W_PointersObject(space, space.w_MethodContext, constants.MTHDCTX_TEMP_FRAME_START+method.tempsize()+stacksize)
+    w_object = model.W_GenericPointersObject(space, space.w_MethodContext, constants.MTHDCTX_TEMP_FRAME_START+method.tempsize()+stacksize)
     w_object.store(space, constants.CTXPART_SENDER_INDEX, w_sender)
     w_object.store(space, constants.CTXPART_PC_INDEX, space.wrap_int(pc))
     w_object.store(space, constants.CTXPART_STACKP_INDEX, space.wrap_int(method.tempsize()+stackpointer))
@@ -113,7 +113,7 @@ def blockcontext(w_sender=None, pc=13, stackpointer=1, stacksize=5,
         w_sender = space.w_nil
     if home is None:
         home = methodcontext()
-    w_object = model.W_PointersObject(space, space.w_BlockContext, constants.MTHDCTX_TEMP_FRAME_START+stacksize)
+    w_object = model.W_GenericPointersObject(space, space.w_BlockContext, constants.MTHDCTX_TEMP_FRAME_START+stacksize)
     w_object.store(space, constants.CTXPART_SENDER_INDEX, w_sender)
     w_object.store(space, constants.CTXPART_PC_INDEX, space.wrap_int(pc))
     w_object.store(space, constants.CTXPART_STACKP_INDEX, space.wrap_int(stackpointer))

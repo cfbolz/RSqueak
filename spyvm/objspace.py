@@ -40,8 +40,11 @@ class ConstantObject(object):
     import_from_mixin(ConstantMixin)
     default_value = None
 
-def empty_object():
-    return instantiate(model.W_PointersObject)
+def empty_object(generic=True):
+    if generic:
+        return instantiate(model.W_GenericPointersObject)
+    else:
+        return instantiate(model.W_PointersObjectNoFields)
 
 class ObjSpace(object):
     _immutable_fields_ = ['objtable']
@@ -129,21 +132,21 @@ class ObjSpace(object):
     def make_bootstrap_classes(self):
         names = [ "w_" + name for name in constants.classes_in_special_object_table.keys() ]
         for name in names:
-            cls = empty_object()
+            cls = empty_object(generic=True)
             self.add_bootstrap_class(name, cls)
 
     def add_bootstrap_object(self, name, obj):
         self.objtable[name] = obj
         setattr(self, name, obj)
 
-    def make_bootstrap_object(self, name):
-        obj = empty_object()
+    def make_bootstrap_object(self, name, generic=True):
+        obj = empty_object(generic=generic)
         self.add_bootstrap_object(name, obj)
 
     def make_bootstrap_objects(self):
         self.make_bootstrap_object("w_charactertable")
-        self.make_bootstrap_object("w_true")
-        self.make_bootstrap_object("w_false")
+        self.make_bootstrap_object("w_true", generic=False)
+        self.make_bootstrap_object("w_false", generic=False)
         self.make_bootstrap_object("w_special_selectors")
         self.add_bootstrap_object("w_minus_one", model.W_SmallInteger(-1))
         self.add_bootstrap_object("w_zero", model.W_SmallInteger(0))

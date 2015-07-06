@@ -277,7 +277,7 @@ def create_process(interp, s_frame):
     space = interp.space
     w_active_process = wrapper.scheduler(space).active_process()
     assert isinstance(w_active_process, model.W_PointersObject)
-    w_benchmark_proc = model.W_PointersObject(
+    w_benchmark_proc = model.W_GenericPointersObject(
         space, w_active_process.getclass(space), w_active_process.size()
     )
     if interp.image.version.has_closures:

@@ -394,6 +394,12 @@ class GenericObject(object):
     def ispointers(self):
         return self.format < 5
 
+    def isempty(self):
+        return self.format == 0
+
+    def isvariable(self):
+        return self.format > 1
+
     def isweak(self):
         return self.format == 4
 
@@ -419,8 +425,15 @@ class GenericObject(object):
         if self.w_object is None:
             # the instantiate call circumvents the constructors
             # and makes empty objects
-            if self.ispointers():
-                self.w_object = objectmodel.instantiate(model.W_PointersObject)
+            if self.isweak():
+                self.w_object = objectmodel.instantiate(model.W_GenericPointersObject)
+            elif self.isempty():
+                self.w_object = objectmodel.instantiate(model.W_PointersObjectNoFields)
+            elif self.ispointers():
+                if not self.isvariable() and self.size < 5:
+                    self.w_object = objectmodel.instantiate(model.W_SmallPointersObject)
+                else:
+                    self.w_object = objectmodel.instantiate(model.W_GenericPointersObject)
             elif self.format == 5:
                 raise error.CorruptImageError("Unknown format 5")
             elif self.isfloat():
