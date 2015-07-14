@@ -6,14 +6,11 @@ if [ "$BUILD_ARCH" == "armv6" ]; then
     MIRROR=http://archive.raspbian.org/raspbian
     VERSION=wheezy
     CHROOT_ARCH=armhf
-    HOST_DEPENDENCIES="debootstrap qemu-user-static binfmt-support sbuild scratchbox2 gcc-arm-linux-gnueabihf libsdl1.2-dev libffi-dev libstdc++6:i386"
     GUEST_DEPENDENCIES="build-essential python libffi-dev libsdl1.2-dev libpulse-dev"
 
     # host deps
-    sudo apt-get update
     git clone https://github.com/raspberrypi/tools.git tools
     TOOLS_DIR=$PWD/tools
-    sudo apt-get install -qq -y ${HOST_DEPENDENCIES}
 
     # chroot
     sudo mkdir ${CHROOT_DIR}
@@ -29,10 +26,6 @@ if [ "$BUILD_ARCH" == "armv6" ]; then
     sb2-config -d rasp
     popd
 else if [ "$BUILD_ARCH" == "armv7" ]; then
-    sudo apt-get update
-
-    # install arm environment
-    sudo apt-get install -y debootstrap schroot binfmt-support qemu-system qemu-user-static scratchbox2 gcc-arm-linux-gnueabi libsdl1.2-dev libffi-dev
     mkdir precise_arm
     sudo chown $USER /etc/schroot/schroot.conf
     echo "
