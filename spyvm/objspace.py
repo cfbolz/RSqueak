@@ -40,11 +40,13 @@ class ConstantObject(object):
     import_from_mixin(ConstantMixin)
     default_value = None
 
-def empty_object(generic=True):
+def empty_object(space, generic=True):
     if generic:
-        return instantiate(model.W_GenericPointersObject)
+        w_obj = instantiate(model.W_GenericPointersObject)
     else:
-        return instantiate(model.W_PointersObjectNoFields)
+        w_obj = instantiate(model.W_PointersObjectNoFields)
+    w_obj._space = space
+    return w_obj
 
 class ObjSpace(object):
     _immutable_fields_ = ['objtable']
@@ -68,7 +70,7 @@ class ObjSpace(object):
 
         # Create the nil object.
         # Circumvent the constructor because nil is already referenced there.
-        w_nil = empty_object()
+        w_nil = empty_object(self)
         w_nil.w_class = None
         self.add_bootstrap_object("w_nil", w_nil)
 
@@ -132,7 +134,7 @@ class ObjSpace(object):
     def make_bootstrap_classes(self):
         names = [ "w_" + name for name in constants.classes_in_special_object_table.keys() ]
         for name in names:
-            cls = empty_object(generic=True)
+            cls = empty_object(self, generic=True)
             self.add_bootstrap_class(name, cls)
 
     def add_bootstrap_object(self, name, obj):
@@ -140,7 +142,7 @@ class ObjSpace(object):
         setattr(self, name, obj)
 
     def make_bootstrap_object(self, name, generic=True):
-        obj = empty_object(generic=generic)
+        obj = empty_object(self, generic=generic)
         self.add_bootstrap_object(name, obj)
 
     def make_bootstrap_objects(self):

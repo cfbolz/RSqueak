@@ -604,7 +604,7 @@ class W_AbstractObjectWithClassReference(W_AbstractObjectWithIdentityHash):
     def guess_classname(self):
         if self.has_class():
             if self.w_class.has_strategy():
-                class_shadow = self.class_shadow(self.space())
+                class_shadow = self.class_shadow(self.w_class.space())
                 return class_shadow.name
             else:
                 # We cannot access the class during the initialization sequence.
@@ -650,6 +650,13 @@ class W_PointersObject(W_AbstractObjectWithClassReference):
 
     def is_weak(self):
         return False
+
+    def fillin(self, space, g_self):
+        W_AbstractObjectWithClassReference.fillin(self, space, g_self)
+        self._space = space
+        # Recursive fillin required to enable specialized storage strategies.
+        for g_obj in g_self.pointers:
+            g_obj.fillin(space)
 
     def fillin_weak(self, space, g_self):
         raise NotImplementedError
@@ -756,13 +763,21 @@ class W_PointersObjectNoFields(W_PointersObject):
 
 
 class W_SmallPointersObject(W_PointersObject):
+    """An object with only named fields and with maximum 4 fields. This
+    size is just a guess. It should never be larger than 5 and never
+    include small instances of objects with indexable fields, though,
+    because we assume that these things never get a shadow, which
+    right now is only true if they have less than 6 fields (meaning
+    they cannot be used as Classes or Contexts) or if they are not
+    varsized (meaning the cannot be used as method dictionaries,
+    observed objects, or cached objects).
+    """
     repr_classname = "W_SmallPointersObject"
-    _attrs_ = ["f1", "f2", "f3", "f4", "_size", "shadow"]
-    _immutable_fields_ = ["size"]
+    _attrs_ = ["f1", "f2", "f3", "f4", "_size"]
+    _immutable_fields_ = ["_size?"]
 
     def _initialize_storage(self, space, size, weak=False):
         assert weak == False
-        self.shadow = None
         self._size = size
         self.f1 = space.w_nil
         self.f2 = space.w_nil
@@ -771,14 +786,10 @@ class W_SmallPointersObject(W_PointersObject):
 
     def fillin(self, space, g_self):
         W_PointersObject.fillin(self, space, g_self)
-        # Recursive fillin required to enable specialized storage strategies.
-        for g_obj in g_self.pointers:
-            g_obj.fillin(space)
         pointers = g_self.get_pointers()
         assert len(pointers) < 5
         assert g_self.size < 5
         self._size = g_self.size
-        self.shadow = None
         self.f1 = space.w_nil
         self.f2 = space.w_nil
         self.f3 = space.w_nil
@@ -803,8 +814,6 @@ class W_SmallPointersObject(W_PointersObject):
     def store(self, space, index0, w_value):
         if not int_between(0, index0, self.size()):
             raise IndexError
-        if self.shadow is not None:
-            self.shadow.store(self, index0, w_value)
         if index0 == 0: self.f1 = w_value
         elif index0 == 1: self.f2 = w_value
         elif index0 == 2: self.f3 = w_value
@@ -817,25 +826,11 @@ class W_SmallPointersObject(W_PointersObject):
     def instsize(self):
         return self.size()
 
-    @objectmodel.specialize.arg(2)
-    def as_special_get_shadow(self, space, TheClass):
-        shadow = self.shadow
-        if not isinstance(shadow, TheClass):
-            shadow = TheClass(space, self, self.size())
-        assert isinstance(shadow, TheClass)
-        self.shadow = shadow
-        return shadow
-
     def _become(self, w_other):
         assert isinstance(w_other, W_SmallPointersObject)
         # Only one strategy will handle the become (or none of them).
         # The receivers strategy gets the first shot.
         # If it doesn't want to, let the w_other's strategy handle it.
-        if self.shadow and self.shadow.handles_become():
-            self.shadow.become(w_other)
-        elif w_other.shadow and w_other.shadow.handles_become():
-            w_other.shadow.become(self)
-        self.shadow, w_other.shadow = w_other.shadow, self.shadow
         self._size, w_other._size = w_other._size, self._size
         self.f1, w_other.f1 = w_other.f1, self.f1
         self.f2, w_other.f2 = w_other.f2, self.f2
@@ -848,7 +843,6 @@ class W_SmallPointersObject(W_PointersObject):
         my_pointers = self.fetch_all(space)
         w_result = W_SmallPointersObject(space, self.getclass(space), len(my_pointers))
         w_result.store_all(space, my_pointers)
-        w_result.shadow = self.shadow
         return w_result
 
 
@@ -856,7 +850,7 @@ class W_GenericPointersObject(W_PointersObject):
     _attrs_ = ['strategy', '_storage']
     # TODO -- is it viable to have these as pseudo-immutable?
     # Measurably increases performance, since they do change rarely.
-    # _immutable_attrs_ = ['strategy?', '_storage?']
+    _immutable_attrs_ = ['strategy?', '_storage?']
     strategy = None
     repr_classname = "W_GenericPointersObject"
     rstrat.make_accessors(strategy='strategy', storage='_storage')
@@ -866,10 +860,7 @@ class W_GenericPointersObject(W_PointersObject):
         space.strategy_factory.set_initial_strategy(self, storage_type, size)
 
     def fillin(self, space, g_self):
-        W_AbstractObjectWithClassReference.fillin(self, space, g_self)
-        # Recursive fillin required to enable specialized storage strategies.
-        for g_obj in g_self.pointers:
-            g_obj.fillin(space)
+        W_PointersObject.fillin(self, space, g_self)
         pointers = g_self.get_pointers()
         storage_type = space.strategy_factory.strategy_type_for(pointers, weak=False) # do not fill in weak lists, yet
         space.strategy_factory.set_initial_strategy(self, storage_type, len(pointers), pointers)

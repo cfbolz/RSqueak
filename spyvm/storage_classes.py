@@ -252,8 +252,8 @@ class ClassShadow(AbstractCachingShadow):
     def initialize_methoddict(self):
         "NOT_RPYTHON"     # this is only for testing.
         if self._s_methoddict is None:
-            w_methoddict = model.W_SmallPointersObject(self.space, None, 2)
-            w_methoddict.store(self.space, constants.METHODDICT_VALUES_INDEX, model.W_PointersObjectNoFields(self.space, None, 0))
+            w_methoddict = model.W_GenericPointersObject(self.space, None, 2)
+            w_methoddict.store(self.space, constants.METHODDICT_VALUES_INDEX, model.W_GenericPointersObject(self.space, None, 0))
             self.store_s_methoddict(w_methoddict.as_methoddict_get_shadow(self.space))
 
     def installmethod(self, w_selector, w_method):
