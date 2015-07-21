@@ -51,7 +51,6 @@ addons:
       - sbuild
       - scratchbox2
       - gcc-arm-linux-gnueabihf
-      - libsdl1.2-dev
       - libstdc++6:i386
       - schroot
       - qemu-system
