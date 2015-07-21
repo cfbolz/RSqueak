@@ -25,6 +25,7 @@ addons:
     packages:
       - build-essential
       - libffi-dev
+      - libffi-dev:i386
       - python-dev
       - libffi6:i386
       - libbz2-1.0:i386
